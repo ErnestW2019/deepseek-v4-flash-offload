@@ -27,29 +27,23 @@ Placing all experts on device is impossible, so the experts **must** live off-de
 
 ## Architecture
 
-```
-vLLM scheduler / PagedAttention / OpenAI server
-        │
-        ▼
-[vllm.general_plugins]  dsv4_plugin:register_model
-        │  patches at runtime
-        ▼
-OffloadDeepseekV4MoE        (replaces vllm_ascend DeepseekV4MoE)
-        │
-        ▼
-ExpertOffloadEngine
-   ├─ host bank : packed MXFP4 experts (pinned host RAM, ~150 GB)
-   ├─ slot cache: NPU expert slots, LRU-evicted
-   └─ load_weights tee: expert tensors never touch the device
-```
+![dsv4-plugin system architecture](docs/diagrams/architecture.svg)
 
 Three-tier storage:
 
 | Tier | Content | Budget |
 |---|---|---|
-| HBM | dense weights + KV cache/activations + hot expert slots | ≤ 128 GB |
-| Host pinned RAM | packed MXFP4 expert pool | ~150 GB |
-| NVMe | cold experts (optional) | — |
+| HBM (128 GB) | dense weights ~9 GB + KV/activations/graph 10–20 GB + hot expert slots 32–80 GB | ≤ 128 GB |
+| Host pinned RAM (628 GB) | packed MXFP4 expert pool ~150 GB | ample |
+| L3 NVMe | cold experts (optional) | — |
+
+### Data flow
+
+![Three-tier expert storage and data flow](docs/diagrams/storage.svg)
+
+### Execution flow (one layer, one step)
+
+![Execution sequence for one MoE layer](docs/diagrams/sequence.svg)
 
 ## Highlights
 
@@ -62,6 +56,8 @@ Three-tier storage:
 ## Results
 
 All numbers measured on a single Ascend 950PR (128 GB HBM), `DeepSeek-V4-Flash`, greedy decoding. See [DESIGN.md](DESIGN.md) §9 / §10 for the full record.
+
+![Decode throughput: MXFP4 (a4w4) vs bf16](docs/diagrams/performance.svg)
 
 Single-stream (64-token greedy; experts are ~1/4 the size in FP4):
 

@@ -27,29 +27,23 @@
 
 ## 架构
 
-```
-vLLM 调度 / PagedAttention / OpenAI 服务化
-        │
-        ▼
-[vllm.general_plugins]  dsv4_plugin:register_model
-        │  运行时打补丁
-        ▼
-OffloadDeepseekV4MoE        （替换 vllm_ascend 的 DeepseekV4MoE）
-        │
-        ▼
-ExpertOffloadEngine
-   ├─ host bank : 打包态 MXFP4 专家（host pinned RAM，约 150 GB）
-   ├─ slot cache: NPU 专家槽位，LRU 淘汰
-   └─ load_weights tee: 专家张量不上卡
-```
+![dsv4-plugin 系统架构](docs/diagrams/architecture.svg)
 
 三级存储：
 
 | 层 | 内容 | 预算 |
 |---|---|---|
-| HBM | dense 权重 + KV/激活 + 热专家槽位 | ≤ 128 GB |
-| host pinned RAM | 打包 MXFP4 专家池 | ~150 GB |
-| NVMe | 冷专家兜底（可选） | — |
+| HBM（128 GB） | dense 权重 ~9 GB + KV/激活/图 10–20 GB + 热专家槽位 32–80 GB | ≤ 128 GB |
+| host pinned RAM（628 GB） | 打包 MXFP4 专家池 ~150 GB | 充裕 |
+| L3 NVMe | 冷专家兜底（可选） | — |
+
+### 数据流
+
+![三级存储与数据流](docs/diagrams/storage.svg)
+
+### 单步执行时序
+
+![单层 MoE 执行时序](docs/diagrams/sequence.svg)
 
 ## 特性
 
@@ -62,6 +56,8 @@ ExpertOffloadEngine
 ## 实测结果
 
 均在单卡 Ascend 950PR（128 GB HBM）、`DeepSeek-V4-Flash`、贪心解码下测得。完整记录见 [DESIGN.md](DESIGN.md) §9 / §10。
+
+![解码吞吐：MXFP4（a4w4）vs bf16](docs/diagrams/performance.svg)
 
 单流（64-token 贪心；专家在 FP4 下体积约为 1/4）：
 

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg" role="img"
+           aria-labelledby="storage-title storage-desc">
+        <title id="storage-title">Three-tier expert storage on a single Ascend 950PR</title>
+        <desc id="storage-desc">Expert weights live across three tiers: hot experts cached in 128 GB HBM as bf16 slots, the packed MXFP4 expert pool (~150 GB, 94% of all weights) pinned in 628 GB host RAM, and a cold expert tier on L3 NVMe refilled on demand. Host-to-device transfers run at 19.8-51.3 GB/s, eviction from HBM follows LRU.</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#bf4520"/>
+          </marker>
+        </defs>
+
+        <!-- background -->
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- ============ zones (drawn first) ============ -->
+        <rect x="40" y="64"  width="880" height="116" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <rect x="40" y="240" width="880" height="116" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <rect x="40" y="416" width="880" height="116" rx="6" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+
+        <!-- ============ arrows (accent solid up · dashed evict down) ============ -->
+        <!-- H2D: host pool -> HBM -->
+        <line x1="660" y1="240" x2="660" y2="180" stroke="#bf4520" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <!-- Evict: HBM -> host, LRU -->
+        <line x1="780" y1="180" x2="780" y2="240" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- Refill: NVMe -> host -->
+        <line x1="660" y1="416" x2="660" y2="356" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- ============ arrow labels (mask + text) ============ -->
+        <rect x="600" y="204" width="120" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="660" y="213" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace"
+              text-anchor="middle" letter-spacing="0.06em">H2D 19.8-51.3 GB/s</text>
+
+        <rect x="742" y="204" width="76" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="780" y="213" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace"
+              text-anchor="middle" letter-spacing="0.06em">EVICT (LRU)</text>
+
+        <rect x="618" y="380" width="84" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="660" y="389" fill="#5a6580" font-size="8" font-family="'Geist Mono', ui-monospace, monospace"
+              text-anchor="middle" letter-spacing="0.06em">REFILL</text>
+
+        <!-- ============ zone labels ============ -->
+        <text x="64" y="82" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">HBM · ACCELERATOR · 128 GB</text>
+        <text x="64" y="258" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">PINNED HOST RAM · 628 GB</text>
+        <text x="64" y="434" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">L3 NVMe · COLD CAPACITY</text>
+
+        <!-- ============ zone notes ============ -->
+        <text x="64" y="170" fill="#5a6580" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">dense + KV + graph · ~19-29 GB resident</text>
+        <text x="64" y="346" fill="#5a6580" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">94% of all weights · eviction target</text>
+        <text x="64" y="522" fill="#5a6580" font-size="9" font-family="'Geist Mono', ui-monospace, monospace">NVMe-backed · prewarmed before use</text>
+
+        <!-- ============ nodes ============ -->
+
+        <!-- Hot Expert Slots (focal) -->
+        <rect x="64" y="92" width="248" height="56" rx="6" fill="#f5f5f5"/>
+        <rect x="64" y="92" width="248" height="56" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1"/>
+        <rect x="72" y="98" width="28" height="12" rx="2" fill="transparent" stroke="rgba(191,69,32,0.40)" stroke-width="0.8"/>
+        <text x="86" y="107" fill="rgba(191,69,32,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">HOT</text>
+        <text x="188" y="121" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Hot Expert Slots</text>
+        <text x="188" y="137" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">bf16 · 32-80 GB</text>
+
+        <!-- Packed Expert Pool (store) -->
+        <rect x="64" y="268" width="248" height="56" rx="6" fill="#f5f5f5"/>
+        <rect x="64" y="268" width="248" height="56" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <rect x="72" y="274" width="36" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="90" y="283" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">POOL</text>
+        <text x="188" y="297" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Packed Expert Pool</text>
+        <text x="188" y="313" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">MXFP4 · ~150 GB</text>
+
+        <!-- Cold Expert Tier (store) -->
+        <rect x="64" y="444" width="248" height="56" rx="6" fill="#f5f5f5"/>
+        <rect x="64" y="444" width="248" height="56" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <rect x="72" y="450" width="36" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>
+        <text x="90" y="459" fill="rgba(45,49,66,0.80)" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">COLD</text>
+        <text x="188" y="473" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Cold Expert Tier</text>
+        <text x="188" y="489" fill="#4f5d75" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">on-demand refill</text>
+
+        <!-- ============ legend (horizontal strip) ============ -->
+        <line x1="40" y1="580" x2="920" y2="580" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">LEGEND</text>
+
+        <rect x="120" y="588" width="12" height="12" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1"/>
+        <text x="140" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">FOCAL</text>
+
+        <rect x="290" y="588" width="12" height="12" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+        <text x="310" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">STORE</text>
+
+        <rect x="460" y="588" width="12" height="12" rx="2" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <text x="480" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">ZONE</text>
+
+        <line x1="630" y1="594" x2="652" y2="594" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="662" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">TRANSFER IN</text>
+
+        <line x1="800" y1="594" x2="822" y2="594" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="832" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.14em">EVICT</text>
+      </svg>
