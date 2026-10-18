@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsv4-plugin"
+version = "0.1.0"
+description = "Out-of-tree vLLM plugin: DeepSeek-V4 expert offload on a single Ascend NPU"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Apache-2.0" }
+authors = [{ name = "polar" }]
+keywords = [
+    "vllm",
+    "vllm-ascend",
+    "ascend",
+    "npu",
+    "deepseek",
+    "moe",
+    "expert-offloading",
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# 刻意留空：运行时依赖（torch/torch-npu/vllm/vllm-ascend）已在 venv 中，
+# 避免 pip 解析时去动这些重依赖。所需版本见 README「Requirements」。
+dependencies = []
+
+[project.entry-points."vllm.general_plugins"]
+dsv4_offload = "dsv4_plugin:register_model"
+
+[tool.setuptools]
+packages = ["dsv4_plugin", "dsv4_plugin.core", "dsv4_plugin.models"]
