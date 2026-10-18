@@ -10,6 +10,7 @@ TMP = "/tmp/diagrams/frames"
 os.makedirs(TMP, exist_ok=True)
 
 W, H = 960, 660
+SS = 2   # raster supersample: render at 2x so GIFs stay crisp on HiDPI screens
 PAPER = "#f5f5f5"
 INK = "#2d3142"
 MUTED = "#4f5d75"
@@ -56,12 +57,22 @@ def svg(body):
 
 def render(body, path):
     cairosvg.svg2png(bytestring=svg(body).encode("utf-8"), write_to=path,
-                     output_width=W, output_height=H)
+                     output_width=W * SS, output_height=H * SS)
 
 
 def make_gif(paths, out, duration=90):
-    frames = [Image.open(p).convert("P", palette=Image.ADAPTIVE, colors=128)
-              for p in paths]
+    rgb = [Image.open(p).convert("RGB") for p in paths]
+    # One global 256-colour palette (sampled from a spread of downscaled frames)
+    # so the design colours stay exact and identical on every frame -- no
+    # per-frame palette flicker, no 128-colour banding on text/edges.
+    step = max(1, len(rgb) // 12)
+    samples = rgb[::step][:12]
+    sw, sh = samples[0].width // 4, samples[0].height // 4
+    strip = Image.new("RGB", (sw, sh * len(samples)))
+    for i, im in enumerate(samples):
+        strip.paste(im.resize((sw, sh), Image.LANCZOS), (0, i * sh))
+    pal = strip.quantize(colors=256, method=Image.MEDIANCUT, dither=Image.NONE)
+    frames = [im.quantize(palette=pal, dither=Image.NONE) for im in rgb]
     frames[0].save(out, save_all=True, append_images=frames[1:],
                    duration=duration, loop=0, optimize=True, disposal=2)
 
