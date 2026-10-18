@@ -1,4 +1,8 @@
-# dsv4-plugin
+# deepseek-v4-flash-offload
+
+[![CI](https://github.com/ErnestW2019/deepseek-v4-flash-offload/actions/workflows/ci.yml/badge.svg)](https://github.com/ErnestW2019/deepseek-v4-flash-offload/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 
 **在单张昇腾 NPU 上，以 out-of-tree 插件方式为 vLLM / vllm-ascend 实现 `DeepSeek-V4-Flash` 专家卸载推理。**
 
@@ -8,7 +12,7 @@
 
 ## 概述
 
-`dsv4-plugin` 让 **单卡 Ascend 950PR（128 GB HBM）** 能够服务 `DeepSeek-V4-Flash`，且**不 fork** vLLM / vllm-ascend。
+`deepseek-v4-flash-offload` 让 **单卡 Ascend 950PR（128 GB HBM）** 能够服务 `DeepSeek-V4-Flash`，且**不 fork** vLLM / vllm-ascend。
 
 权重约 159.6 GB，其中路由专家约 150.6 GB（94%），远超单卡 HBM。因此插件不把专家全部解压上卡，而是将专家以**打包态（MXFP4）常驻 host 内存**，按需搬运到 NPU，并用 **LRU 槽位缓存**保存已上卡的专家。
 
@@ -27,7 +31,7 @@
 
 ## 架构
 
-![dsv4-plugin 系统架构](docs/diagrams/architecture.svg)
+![deepseek-v4-flash-offload 系统架构](docs/diagrams/architecture.svg)
 
 三级存储：
 
@@ -189,8 +193,14 @@ dsv4_plugin/
 serve.sh                    启动 OpenAI 兼容服务
 accept.py                   HTTP 验收基准
 test_*.py                   测试 / 自检脚本
+_bench_dequant.py           微基准：FP4/FP8 反量化吞吐
+_bench_gmm.py               微基准：grouped-GEMM vs 逐专家循环
+docs/diagrams/              图源与渲染出的 GIF/SVG 资源
 pyproject.toml              打包 + vllm.general_plugins entry point
 DESIGN.md                   设计文档 + M4/M5 实测记录（中文）
+CONTRIBUTING.md             构建、测试与贡献指南
+CHANGELOG.md                版本变更记录
+LICENSE                     Apache-2.0
 ```
 
 ## 设计文档
@@ -203,6 +213,10 @@ DESIGN.md                   设计文档 + M4/M5 实测记录（中文）
 - **仅单卡**：此处专家卸载假设 TP=1、无专家并行。
 - **`a4w4` 与 fp8 参考路径不逐位一致**（激活量化不同），按调优后的容差验证。
 - 数据来自特定 CANN / vllm-ascend 构建，不同构建可能有所差异。
+
+## 参与贡献
+
+环境搭建、自检运行与提交流程见 [CONTRIBUTING.md](CONTRIBUTING.md)；版本变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 

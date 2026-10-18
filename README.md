@@ -1,4 +1,8 @@
-# dsv4-plugin
+# deepseek-v4-flash-offload
+
+[![CI](https://github.com/ErnestW2019/deepseek-v4-flash-offload/actions/workflows/ci.yml/badge.svg)](https://github.com/ErnestW2019/deepseek-v4-flash-offload/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 
 **Single-card `DeepSeek-V4-Flash` inference via expert offloading, as an out-of-tree plugin for vLLM / vllm-ascend on Ascend NPU.**
 
@@ -8,7 +12,7 @@
 
 ## Overview
 
-`dsv4-plugin` makes it possible to **serve `DeepSeek-V4-Flash` on a single Ascend 950PR (128 GB HBM)** without a fork of vLLM or vllm-ascend.
+`deepseek-v4-flash-offload` makes it possible to **serve `DeepSeek-V4-Flash` on a single Ascend 950PR (128 GB HBM)** without a fork of vLLM or vllm-ascend.
 
 The checkpoint is ~159.6 GB, of which the routed MoE experts are ~150.6 GB (94%) — far beyond a single card's HBM. Instead of decompressing and placing every expert on device, this plugin keeps the experts **packed (MXFP4) in host RAM** and moves them to the NPU on demand, caching dequantized/quantized experts in an **LRU slot cache**.
 
@@ -27,7 +31,7 @@ Placing all experts on device is impossible, so the experts **must** live off-de
 
 ## Architecture
 
-![dsv4-plugin system architecture](docs/diagrams/architecture.svg)
+![deepseek-v4-flash-offload system architecture](docs/diagrams/architecture.svg)
 
 Three-tier storage:
 
@@ -189,8 +193,14 @@ dsv4_plugin/
 serve.sh                    Launch the OpenAI-compatible server
 accept.py                   HTTP acceptance benchmark
 test_*.py                   Test / self-check scripts
+_bench_dequant.py           Microbench: FP4/FP8 dequantization throughput
+_bench_gmm.py               Microbench: grouped-GEMM vs per-expert loop
+docs/diagrams/              Diagram sources and rendered GIF/SVG assets
 pyproject.toml              Packaging + vllm.general_plugins entry point
 DESIGN.md                   Design doc + measured M4/M5 results (Chinese)
+CONTRIBUTING.md             How to build, test and contribute
+CHANGELOG.md                Release history
+LICENSE                     Apache-2.0
 ```
 
 ## Design documents
@@ -203,6 +213,10 @@ DESIGN.md                   Design doc + measured M4/M5 results (Chinese)
 - **Single card only.** Expert offloading here assumes TP=1, no expert parallelism.
 - **`a4w4` is not bit-exact** with the fp8 reference path (activation quantization differs); it is validated against tuned tolerances.
 - Numbers are from a specific CANN / vllm-ascend build; different builds may vary.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up the environment, run the self-checks, and submit changes. Release history lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

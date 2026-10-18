@@ -1,15 +1,16 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dsv4-plugin"
+name = "deepseek-v4-flash-offload"
 version = "0.1.0"
-description = "Out-of-tree vLLM plugin: DeepSeek-V4 expert offload on a single Ascend NPU"
+description = "Out-of-tree vLLM plugin: DeepSeek-V4-Flash expert offload on a single Ascend NPU"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-license = { text = "Apache-2.0" }
-authors = [{ name = "polar" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "ErnestW2019" }]
 keywords = [
     "vllm",
     "vllm-ascend",
@@ -20,7 +21,6 @@ keywords = [
     "expert-offloading",
 ]
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -28,8 +28,15 @@ classifiers = [
 # 避免 pip 解析时去动这些重依赖。所需版本见 README「Requirements」。
 dependencies = []
 
+[project.urls]
+Repository = "https://github.com/ErnestW2019/deepseek-v4-flash-offload"
+
 [project.entry-points."vllm.general_plugins"]
 dsv4_offload = "dsv4_plugin:register_model"
 
 [tool.setuptools]
+# The plugin imports the top-level helper modules `npu_ops` and `offload`
+# (and ships `loader` / `model_npu` for reference), so they must be part of the
+# wheel — otherwise a non-editable `pip install .` would fail with ImportError.
 packages = ["dsv4_plugin", "dsv4_plugin.core", "dsv4_plugin.models"]
+py-modules = ["npu_ops", "offload", "loader", "model_npu"]

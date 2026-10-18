@@ -67,9 +67,10 @@ vLLM 调度 / PagedAttention / OpenAI 服务化
         │
         ▼
 [vllm.general_plugins]  dsv4_plugin:register_model
-        │  覆盖注册 arch
+        │  运行时替换模块符号（不新增 arch，不改 site-packages）
         ▼
-OffloadDeepseekV4ForCausalLM        (子类，仅覆写 MoE 与 load_weights)
+vllm_ascend: DeepseekV4MoE → OffloadDeepseekV4MoE
+            AscendDeepseekV4ForCausalLM.load_weights → tee 拦截
         │
         ▼
 OffloadDeepseekV4MoE                (子类，替换 FusedMoE)
@@ -96,7 +97,7 @@ ExpertOffloadEngine  ← 由 offload.ExpertBank 演进
 
 ---
 
-## 4. 目录结构（拟）
+## 4. 目录结构（规划稿）
 
 ```
 dsv4_offload/                       # 本仓库根
@@ -108,11 +109,15 @@ dsv4_offload/                       # 本仓库根
       engine.py                     #   ExpertOffloadEngine（host bank + 槽位 LRU + 预取）
       layout.py                     #   vLLM 张量布局适配（打包 FP4 <-> FusedMoE 期望）
     models/
-      deepseek_v4.py                #   OffloadDeepseekV4ForCausalLM / OffloadDeepseekV4MoE
+      deepseek_v4.py                #   OffloadDeepseekV4MoE + install_patches()
     kernels/
       grouped_gemm.py               #   昇腾 grouped-GEMM 路径（M4）
   pyproject.toml                    # 【新增】打包 + entry_points
 ```
+
+> 说明：上表为规划稿。实际交付时 `layout.py` 的职责并入 `core/engine.py`，
+> `kernels/grouped_gemm.py` 的 grouped-GEMM 实现落在 `models/deepseek_v4.py`
+> （含 bf16 与 MXFP4 a4w4 两条路径）；仓库最终布局见 README「Repository layout」。
 
 ---
 
@@ -122,15 +127,19 @@ dsv4_offload/                       # 本仓库根
 
 ```python
 def register_model():
-    from vllm import ModelRegistry
-    ModelRegistry.register_model(
-        "DeepseekV4ForCausalLM",
-        "dsv4_plugin.models.deepseek_v4:OffloadDeepseekV4ForCausalLM",
-    )
+    from dsv4_plugin.models.deepseek_v4 import install_patches
+    install_patches()
 ```
 
+`install_patches()` 幂等地替换两个运行时符号（**不新增 arch 注册、不改 site-packages**）：
+
+- `vllm_ascend.models.deepseek_v4.DeepseekV4MoE` → `OffloadDeepseekV4MoE`
+  （`DeepseekV2DecoderLayer.__init__` 直接引用该模块全局，替换后所有层生效）；
+- `AscendDeepseekV4ForCausalLM.load_weights` → `_offload_load_weights`（专家权重 tee
+  拦截，其余交回原实现，避免复刻数百行加载逻辑）。
+
 打包后用 `[project.entry-points."vllm.general_plugins"]` 暴露 `register_model`，
-即可在**不改 site-packages** 的前提下让 vLLM 用我们的模型类覆盖 vllm-ascend 的注册。
+vLLM 启动时会自动调用它完成上述替换。
 
 ### 5.2 MoE 接管（`OffloadDeepseekV4MoE`）
 
@@ -138,19 +147,21 @@ def register_model():
   但 **不构造 `FusedMoE`**，改为构造 `ExpertOffloadEngine`。
 - `forward`：走 `self.gate(x)` 得到 `weights, indices`，交引擎按专家取权重计算。
   与现有 `model_npu.MoE.forward` 语义一致，便于对齐。
-- **决策点（待确认）**：dense 的 `shared_experts` 保持原 `FusedMoE(shared_experts=...)` 路径常驻 NPU。
+- **dense `shared_experts`（已定稿）**：保持原 `FusedMoE(shared_experts=...)` 路径常驻 NPU，
+  不参与卸载。
 
 ### 5.3 权重加载拦截
 
-在 `OffloadDeepseekV4ForCausalLM.load_weights` 中分流：
+在 `AscendDeepseekV4ForCausalLM.load_weights` 中分流（由插件 tee 拦截）：
 
 - 命中 `layers.N.ffn.experts.M.w{1,2,3}.{weight,scale}` → **不解压、不上卡**，
   直接登记进 host bank（复用 `loader.py` 的 `_EXPERT_RE` 与分组逻辑）。
 - FP8 非专家权重 → 解量化后上卡（现有 `dequant_fp8_weight` 路径）。
 - 其余 → 按目标 dtype 搬迁。
 
-> 需确认：vLLM 的权重迭代接口（`weights_iterator` 产出的 `(name, tensor)`）与
-> 本仓库 `safe_open` 直读的差异，二者需在 M2 对齐。
+> 实现说明：vLLM 的 `weights_iterator` 产出 `(name, tensor)`，与 `loader.py` 的 `safe_open`
+> 直读在 M2 已对齐——命中专家键的由插件 tee 拦截并登记进 host bank，其余原样交回上游
+> `load_weights`。
 
 ### 5.4 计算内核
 
@@ -166,7 +177,7 @@ def register_model():
 |---|---|---|
 | M0 | 环境与可行性：定位 vllm-ascend 源码、跑通插件加载 | `inspect.getfile(vllm_ascend)` 命中预期；插件被 `load_general_plugins` 调用 |
 | M1 | 台阶验证：用一个中小 MoE 模型验证接管链路 | 插件接管后输出与原始一致 |
-| M2 | 单机可跑：DeepSeek-V4-Flash 起服务 | 与 `model_npu.py` / `inference/generate.py` 逐 token 对齐 |
+| M2 | 单机可跑：DeepSeek-V4-Flash 起服务 | 与参考实现（`model_npu.py`）逐 token 对齐 |
 | M3 | 性能：预取 + 槽位调参 | 吞吐/首 token 延迟达标，搬运被掩盖 |
 | M4 | 内核：grouped-GEMM 替换逐专家 | 数值一致，延迟下降 |
 | M5 | 工程化：打包、监控、KV/Engram（后续） | 可重复部署 |
@@ -175,9 +186,9 @@ def register_model():
 
 ## 7. 风险与未决项
 
-1. **vllm-ascend 源码未落盘**：`dsv4-flash-npu/third_party/README.md` 声称已定位，
-   但磁盘上只有 README。需决定是否 clone gitee 镜像 tag v0.23.0 并校验
-   （纯插件路线不强制需要源码，但对齐/调试时需要）。
+1. **vllm-ascend 源码未落盘**：本机只安装了 vllm-ascend 的 wheel，未 clone 源码树。
+   需要对齐/调试时可临时 clone gitee 镜像 tag v0.23.0 并校验
+   （纯插件路线不强制需要源码，但排查接管点时有用）。
 2. ~~**原生 MXFP4 不支持**（aclnn 161002）~~ **已解决（p4-d）**：`npu_grouped_matmul`
    a4w4（`scale=` + transpose-stride 形式）可用，专家常驻 FP4；数值口径见 §9（非逐位对齐，
    激活量化固有误差 ≈5× 于 fp8）。
@@ -193,11 +204,13 @@ def register_model():
 
 ---
 
-## 8. 需用户确认
+## 8. 关键决策（已定稿）
 
-1. 主干形态：**插件优先 + 受控派生兜底**（本稿）是否采纳？
-2. 是否需要现在就 clone 并校验 vllm-ascend v0.23.0 源码到 `third_party/`？
-3. M1 用哪个模型做台阶验证（旧工程建议 Qwen 系）。
+1. 主干形态：采用 **插件优先 + 受控派生兜底**——以 `dsv4_plugin` 作为 out-of-tree 插件接管 MoE，
+   不改 `site-packages`、不 fork vllm-ascend。
+2. vllm-ascend 源码**不纳入本仓库**；仅在需要对齐/调试时按 §7.1 临时 clone 校验。
+3. M1 台阶验证在本仓库内用合成权重 / 微型配置完成（`test_model.py` / `test_moe_align.py`），
+   不再单独引入外部中小 MoE 模型。
 
 ---
 
@@ -261,7 +274,7 @@ bf16 的 1/4，等显存即最佳命中率），故 a4w4 默认走 @2048。
 ### m5-0 服务模式跑通
 
 - 多进程（`VLLM_ENABLE_V1_MULTIPROCESSING=1`）+ `max_num_seqs=8`、8 并发请求跑通，
-  聚合 **19.56 tok/s**（256 tokens / 8 prompts）。
+  聚合 **19.47 tok/s**（256 tokens / 8 prompts；正式验收见 m5-4）。
 - 真实 `vllm serve` + OpenAI `/v1/chat/completions` 返回正常（`"The capital of France is Paris."`）。
 - 注意：多进程下权重在 **EngineCore 进程**加载，driver 进程 `get_engine()` 单例为空
   （`captured=0` 属正常，非 bug）；`test_e2e_vllm.py` 对该情形已打 `[SKIP]`。

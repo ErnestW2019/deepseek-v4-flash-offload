@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-# Generate animated GIFs for dsv4_offload docs, styled per diagram-design skill.
-# Toolchain: cairosvg (SVG -> PNG) + Pillow (frames -> GIF). No ffmpeg on this box.
+# Generate animated GIFs for the deepseek-v4-flash-offload README, styled per the
+# diagram-design skill. Toolchain: cairosvg (SVG -> PNG) + Pillow (frames -> GIF).
+# No ffmpeg required.
 import os
+import tempfile
+
 import cairosvg
 from PIL import Image
 
-OUT = "/home/userlist/ww/dsv4_offload/docs/diagrams"
-TMP = "/tmp/diagrams/frames"
+# Resolve paths relative to this script so it runs from any checkout location.
+OUT = os.path.dirname(os.path.abspath(__file__))
+TMP = os.path.join(tempfile.gettempdir(), "dsv4_flash_offload_frames")
 os.makedirs(TMP, exist_ok=True)
 
 W, H = 960, 660
@@ -77,15 +81,13 @@ def make_gif(paths, out, duration=90):
                    duration=duration, loop=0, optimize=True, disposal=2)
 
 
-def emit(name, bodies, duration, poster_index):
+def emit(name, bodies, duration):
     paths = []
     for i, b in enumerate(bodies):
         p = os.path.join(TMP, f"{name}_{i:03d}.png")
         render(b, p)
         paths.append(p)
     make_gif(paths, os.path.join(OUT, f"{name}.gif"), duration)
-    Image.open(paths[poster_index]).convert("RGB").save(
-        os.path.join(OUT, f"{name}.png"))
     for p in paths:
         os.remove(p)
     print("wrote", name, len(bodies), "frames")
@@ -253,7 +255,7 @@ def build_reveal():
         bodies.append(reveal_body(i, None, 0))   # settled
         bodies.append(reveal_body(i, None, 0))   # hold so it can be read
     bodies += [reveal_body(11, None, 0)] * 3     # longer final hold
-    emit("sequence-reveal", bodies, 150, len(bodies) - 1)
+    emit("sequence-reveal", bodies, 150)
 
 
 # =====================================================================
@@ -308,7 +310,7 @@ def build_decode():
             bodies.append(decode_body(pi, k / (PHASE_FRAMES - 1)))
         bodies.append(decode_body(pi, 1.0))   # hold at phase end
         bodies.append(decode_body(pi, 1.0))
-    emit("decode-step", bodies, 150, len(bodies) - 1)
+    emit("decode-step", bodies, 150)
 
 
 # =====================================================================
@@ -424,7 +426,7 @@ def _node(x, y, w, tag, tagw, title, sub, focal):
 def build_storage():
     n = 30
     bodies = [storage_body(i / n) for i in range(n)]
-    emit("storage-flow", bodies, 160, 0)
+    emit("storage-flow", bodies, 160)
 
 
 # =====================================================================
@@ -584,7 +586,7 @@ def build_lru():
         bodies.append(lru_body(hi, 1, 0.0))   # pre : solid (resolving)
         bodies.append(lru_body(hi, 2, 0.0))   # post: resolved state
         bodies.append(lru_body(hi, 2, 0.0))   # hold resolved state
-    emit("lru-slots", bodies, 180, len(bodies) - 1)
+    emit("lru-slots", bodies, 180)
 
 
 if __name__ == "__main__":

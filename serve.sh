@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DeepSeek-V4-Flash 单卡专家卸载推理服务（vllm serve + dsv4_offload 插件）。
+# DeepSeek-V4-Flash 单卡专家卸载推理服务（vllm serve + dsv4_plugin 插件）。
 #
 # 用法:
 #   ./serve.sh                 # 默认 bf16 精度无损

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg" role="img"
            aria-labelledby="architecture-title architecture-desc">
-        <title id="architecture-title">dsv4-plugin architecture on a single Ascend 950PR</title>
-        <desc id="architecture-desc">The vLLM runtime loads dsv4-plugin through the vllm.general_plugins entry point; the plugin takes over the DeepSeek-V4 MoE layer and drives an expert-offload engine backed by a packed-MXFP4 host bank, an NPU LRU slot cache, and gate-driven prefetch, leaving vllm_ascend's FusedMoE untouched.</desc>
+        <title id="architecture-title">deepseek-v4-flash-offload architecture on a single Ascend 950PR</title>
+        <desc id="architecture-desc">The vLLM runtime loads deepseek-v4-flash-offload through the vllm.general_plugins entry point; the plugin swaps in an offloading MoE class and intercepts expert weights at load time, driving an expert-offload engine backed by a packed-MXFP4 host bank, an NPU LRU slot cache, and gate-driven prefetch, without modifying vllm_ascend's source.</desc>
 
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">

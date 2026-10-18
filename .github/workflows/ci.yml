@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  package:
+    # The runtime self-checks need an Ascend NPU, so CI stays hardware-free:
+    # it byte-compiles every source file and proves the wheel actually ships the
+    # plugin package, the top-level helper modules and the vLLM entry point.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Byte-compile all Python sources
+        run: python -m compileall -q dsv4_plugin npu_ops.py offload.py loader.py model_npu.py
+
+      - name: Build wheel and verify contents
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel
+          python - <<'PY'
+          import glob, zipfile
+
+          whl = glob.glob("dist/*.whl")[0]
+          zf = zipfile.ZipFile(whl)
+          names = zf.namelist()
+
+          required = [
+              "npu_ops.py",
+              "offload.py",
+              "loader.py",
+              "model_npu.py",
+              "dsv4_plugin/__init__.py",
+              "dsv4_plugin/core/engine.py",
+              "dsv4_plugin/models/deepseek_v4.py",
+          ]
+          for req in required:
+              assert any(n.endswith(req) for n in names), f"missing from wheel: {req}"
+
+          ep = next(n for n in names if n.endswith("entry_points.txt"))
+          text = zf.read(ep).decode()
+          assert "vllm.general_plugins" in text, "entry-point group missing"
+          assert "dsv4_plugin:register_model" in text, "entry-point target missing"
+
+          print(f"wheel OK: {whl} ({len(names)} files)")
+          PY
