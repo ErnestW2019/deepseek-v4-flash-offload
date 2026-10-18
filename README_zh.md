@@ -37,13 +37,23 @@
 | host pinned RAM（628 GB） | 打包 MXFP4 专家池 ~150 GB | 充裕 |
 | L3 NVMe | 冷专家兜底（可选） | — |
 
+### 热专家槽位
+
+热专家缓存在 HBM 槽位中，按 LRU 淘汰；随着工作集稳定，命中率逐步升高。
+
+![LRU 专家槽位演化](docs/diagrams/lru-slots.gif)
+
 ### 数据流
 
-![三级存储与数据流](docs/diagrams/storage.svg)
+![三级存储与数据流](docs/diagrams/storage-flow.gif)
 
 ### 单步执行时序
 
-![单层 MoE 执行时序](docs/diagrams/sequence.svg)
+![单层 MoE 执行时序](docs/diagrams/sequence-reveal.gif)
+
+同一单步的引导式动画，逐阶段演示：
+
+![解码单步引导：门控路由、槽位查找、H2D 搬运、分组 GEMM、写回](docs/diagrams/decode-step.gif)
 
 ## 特性
 

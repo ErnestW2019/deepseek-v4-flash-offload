@@ -37,13 +37,23 @@ Three-tier storage:
 | Host pinned RAM (628 GB) | packed MXFP4 expert pool ~150 GB | ample |
 | L3 NVMe | cold experts (optional) | — |
 
+### Hot expert slots
+
+Hot experts are cached in HBM slots and evicted by LRU; the hit rate climbs as the working set stabilizes.
+
+![LRU expert-slot evolution](docs/diagrams/lru-slots.gif)
+
 ### Data flow
 
-![Three-tier expert storage and data flow](docs/diagrams/storage.svg)
+![Three-tier expert storage and data flow](docs/diagrams/storage-flow.gif)
 
 ### Execution flow (one layer, one step)
 
-![Execution sequence for one MoE layer](docs/diagrams/sequence.svg)
+![Execution sequence for one MoE layer](docs/diagrams/sequence-reveal.gif)
+
+The same step as a guided walkthrough, one phase at a time:
+
+![Decode step walkthrough: gate & route, slot lookup, H2D fetch, grouped GEMM, write-back](docs/diagrams/decode-step.gif)
 
 ## Highlights
 
